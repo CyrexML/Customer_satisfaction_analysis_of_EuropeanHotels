@@ -155,7 +155,8 @@ options(digits = 3)
 
 setwd("D:/labSem6/Exploracja danych/ProjektEKS")
 
-
+knitr::opts_knit$set(root.dir = dirname(rstudioapi::getSourceEditorContext()$path))
+knitr::opts_knit$set(root.dir = paste0(dirname(rstudioapi::getSourceEditorContext()$path), "/models"))
 dane <- read.csv("D:\\labSem6\\Exploracja danych\\ProjektEKS\\Europe Hotel Booking Satisfaction Score.csv")
 ```
 
