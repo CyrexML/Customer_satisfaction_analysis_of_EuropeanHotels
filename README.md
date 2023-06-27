@@ -3,3 +3,4 @@ Celem projektu jest badanie czynników wpływających na satysfakcję goście or
 Data taken from [Kaggle](https://www.kaggle.com/datasets/ishansingh88/europe-hotel-satisfaction-score)
 
 You can see all the steps performed, as well as the conclusions in the html file. If you can't see the preview, you can simply download it and open it in your browser
+The code is written in R, executed in Quarto markdown.
