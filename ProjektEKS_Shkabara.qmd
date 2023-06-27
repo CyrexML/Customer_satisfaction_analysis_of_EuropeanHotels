@@ -1,0 +1,1049 @@
+---
+title: "Satysfakcja klientów Hoteli Europiejskich"
+author: "Radzivon Shkabara"
+format: 
+  html:
+    lang: pl
+    self-contained: true
+    self-contained-math: true
+    warning: false
+    error: false
+    toc: true
+    toc-depth: 5
+    author-title: Autorzy 
+    theme: cosmo
+    toc-title: Etapy
+    code-fold: true
+    code-summary: Kod
+editor_options: 
+  chunk_output_type: console
+server: shiny
+---
+
+
+```{css}
+$gray-700: #495057 !default;
+$primary: #06436e !default;
+$body-color: $gray-700 !default;
+
+#quarto-document-content {
+  width: 1700px;
+}
+
+h1 {
+  font-weight: bold;
+  font-style: oblique;
+  color: #5e738b; 
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+
+h2 {
+  font-weight: bold;
+  font-style: oblique;
+  font-size: 30px;
+  color: #5e738b; 
+  font-family: Arial, sans-serif;
+}
+
+h3 {
+  font-size: 30px;
+}
+
+h4 {
+  font-size: 26px;
+}
+
+.blue-text {
+  color: blue;
+}
+
+.large-red-text {
+  color: red, azure1, azure2;
+  font-size: 20px;
+}
+
+h1.title {
+  font-size: 43px;
+  color: #778899;
+  text-align: center;
+  font-style: italic, bold;
+  font-family: Arial, sans-serif;
+  text-shadow: 1px 1px 1px black;
+}
+
+h1.subtitle {
+  font-size: 38px;
+  font-family: "Times New Roman";
+  text-align: center;
+}
+
+h4.author {
+  background-color: aliceblue;
+  text-align: center;
+}
+
+h4.date {
+  background-color: aliceblue;
+  text-align: center;
+}
+
+h2 {
+  text-align: left;
+}
+
+h3 {
+  text-align: left;
+}
+
+h4 {
+  text-align: left;
+}
+
+a:link {
+  color: #5e738b;
+}
+
+a:visited {
+  color: green;
+}
+
+a:hover {
+  color: green;
+}
+
+```
+
+```{css zoom-lib-src, echo = FALSE}
+script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
+```
+
+```{js zoom-jquery, echo = FALSE}
+  $(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+      $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+      $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+      $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+  });
+```
+
+```{r}
+#| include: false
+#| context: data
+
+library(tidymodels)
+library(tidyverse)
+library(discrim)
+library(plotly)
+library(shiny)
+library(ggplot2)
+library(mice)
+library(kableExtra)
+library(car)
+library(flextable)
+library(DT)
+library(e1071)
+library(VIM)
+set.seed(2023)
+options(digits = 3)
+
+setwd("D:/labSem6/Exploracja danych/ProjektEKS")
+
+
+dane <- read.csv("D:\\labSem6\\Exploracja danych\\ProjektEKS\\Europe Hotel Booking Satisfaction Score.csv")
+```
+
+# Wstęp
+
+Zbiór danych, [Europe Hotel Satisfaction Score](https://www.kaggle.com/datasets/ishansingh88/europe-hotel-satisfaction-score), który używamy w tym projekcie, zawiera informacje o satysfakcji klientów obsługą w hotelach Europy, która jest oceniana za pomocą różnych zmiennych i końcowym wynikiem **Satysfakcja klijenta**. Dane które zawiera nasz zbiór posłużą podstawą do tworzenia modeli.
+
+## Cel
+
+Celem projektu jest badanie czynników wpływających na satysfakcję goście oraz stworzenie modelu przewidującego satysfakcji na podstawie danych z naszego zbioru. Identyfikacja najbardziej wpływających na poziom satysfakcji czynników.
+
+# Opis zbioru
+
+Dane zawierają ***`r nrow(dane)`*** rekordów i ***`r length(colnames(dane))`*** zmiennych.
+
+Zmienne zawarte w naszym zbiorze:
+
+-   `satisfaction` - ocena zadowolenia klienta (zadowolony lub niezadowolony).
+-   `Gender` - plec klijenta (mężczyzna lub kobieta).
+-   `Age` - wiek klijęta (od 7 do 85).
+-   `purpose_of_travel` - cel podróży (lotniczy, akademicki, osobisty, biznesowy, turystyczny).
+-   `Type.of.Travel` - typ podróży (Podróże grupowe, Podróże prywatne).
+-   `Type.Of.Booking` - rodzaj rezerwacji (grupowe, indywidualne/pary).
+-   `Hotel.wifi.service` - ocena zadowolenia usługi wifi w hotelu (od 0 do 5).
+-   `Departure.Arrival..convenience` - ocena zadowolenia wygody wyjazdu/przyjazdu (od 0 do 5).
+-   `Ease.of.Online.booking` - ocena zadowolenia łatwości rezerwacji online (od 0 do 5).
+-   `Hotel.location` - ocena zadowolenia z lokalizacji hotelu (od 0 do 5).
+-   `Food.and.drink` - ocena zadowolenia z jedzenia i picia w hotelu (od 0 do 5).
+-   `Stay.comfort` - ocena zadowolenia z komfortu pobytu (od 0 do 5).
+-   `Common.Room.entertainment` - ocena zadowolenia rozrywki w pokoju (od 0 do 5).
+-   `Checkin.Checkout.service` - ocena zadowolenia obsługi przy zameldowania/wymeldowania (od 0 do 5).
+-   `Other.service` - ocena zadowolenia z pozostałych usług (od 0 do 5).
+-   `Cleanliess` - ocena zadowolenia z czystości (od 0 do 5).
+
+```{r}
+#| echo: true
+dane[1:250,] %>% kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) %>% 
+  scroll_box(height = "400px")
+```
+
+Podstawowymi krokami w eksploracyjnej analizie danych są:
+
+-   Zrozumienie danych: zdobądź informacje o strukturze zbioru danych, rozmiarze, typach zmiennych, nazwach kolumn itp. Pozwoli to na lepsze zrozumienie danych przed rozpoczęciem analizy,
+
+-   Czyszczenie danych: wyeliminuj duplikaty, usuń brakujące wartości, przekształć dane, które są w złym formacie lub niepoprawne, i dokonaj innych operacji mających na celu przygotowanie danych do analizy,
+
+-   Wizualizacja danych: użyj różnych technik wizualizacji, takich jak wykresy słupkowe, histogramy, wykresy punktowe itp., aby zobaczyć rozkłady danych, korelacje między zmiennymi i inne wzorce,
+
+-   Statystyki opisowe: oblicz podstawowe statystyki, takie jak średnia, mediana, odchylenie standardowe, korelacje itp., aby uzyskać ogólne pojęcie o danych.
+
+*EDA* jest ważnym etapem w procesie analizy danych, ponieważ umożliwia badaczom lepsze zrozumienie danych, wykrycie problemów jakościowych i wygenerowanie hipotez dotyczących dalszych badań. To także sposób na wizualizację danych i komunikację wyników zespołowi lub interesariuszom.
+
+## Identyfikacja braków danych
+
+Jeżeli wrócimy do poprzedniej tabeli, możemy zobaczyć że w zmiennych występują takie warości jak `Not defined`, czyli *nieznane dane*. Poniższe zestawienie prezentuje braki danych w kolumnach.
+
+```{r}
+#| echo: true
+for(col in colnames(dane)){
+  dane[[col]] <- ifelse(dane[[col]] == "Not defined", NA, dane[[col]])
+}
+
+VIM::aggr(dane, plot = T, numbers = T, prop = F, combined= T, sortVars = F, cex.axis = .8, oma = c(11,5,3,2))
+
+```
+
+```{r}
+#| include: false
+apply(dane, MARGIN = 2, FUN = function(x){sum(is.na(x))})
+```
+
+Braki występują tylko w kolumnie `Type.Of.Booking`.
+
+```{r}
+#| echo: true
+dane[which(is.na(dane$Type.Of.Booking)), ] %>% head(20) %>% kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) %>%
+  scroll_box(height = "400px")
+```
+
+Załóżmy, że w kolumnie `Type.Of.Booking` nie były zanotowane dane o rodzaje rezerwacji. Jednak ze względu na to, że jest to niewielka część w porównaniu do wszystkich danych - decydujemy się na ich usunięcie.
+
+```{r}
+dane <- dane[-which(is.na(dane$Type.Of.Booking)), ]
+```
+
+## Przegląd danych numerycznych
+
+### Podstawowe statystyki opisowe
+
+-   ***Minimum***: Jest to najmniejsza wartość występująca w zbiorze danych. Oznacza ona dolną granicę, poniżej której żadna wartość w zbiorze nie występuje.
+
+-   ***Maximum***: Jest to największa wartość występująca w zbiorze danych. Oznacza ona górną granicę, powyżej której żadna wartość w zbiorze nie występuje.
+
+-   ***Mean***: Jest to średnia arytmetyczna wszystkich wartości w zbiorze danych. Oblicza się go jako sumę wszystkich wartości podzieloną przez liczbę tych wartości. Średnia jest używana do reprezentowania typowej wartości w zbiorze.
+
+-   ***1st Quartile (Q1)***: Jest to wartość, poniżej której znajduje się 25% danych. Można ją interpretować jako punkt, który dzieli uporządkowany zbiór danych na cztery równoliczne części, a Q1 jest dolnym kwartylem.
+
+-   ***Median***: Jest to wartość, która dzieli uporządkowany zbiór danych na dwie równe części. Innymi słowy, jest to środkowa wartość, gdy dane są uporządkowane od najmniejszej do największej. Mediana jest miarą tendencji centralnej i reprezentuje "środek" rozkładu danych.
+
+-   ***3rd Quartile (Q3)***: Jest to wartość, poniżej której znajduje się 75% danych. Można ją interpretować jako punkt, który dzieli uporządkowany zbiór danych na cztery równoliczne części, a Q3 jest górnym kwartylem.
+
+```{r}
+#| echo: true
+na.omit(dane) %>% select_if(is.numeric) %>% 
+  pivot_longer(cols = everything(), names_to = "var") %>% 
+  group_by(var) %>% 
+  summarize(min = min(value),
+            max = max(value),
+            mean = mean(value), 
+            sd = sd(value),
+            Q1 = quantile(value, probs = 0.25),
+            median = median(value),
+            Q3 = quantile(value, probs = 0.75)) %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) %>%
+  scroll_box(height = "450px")
+```
+
+### Korelacja liniowa Pearson'a
+
+Macierz korelacji to tablica numeryczna, która pokazuje stopień zależności między różnymi zmiennymi w zbiorze danych. Jest to ważne narzędzie statystyczne, które pomaga zrozumieć wzorce i relacje między zmiennymi.
+
+Każda komórka reprezentuje współczynnik korelacji liniowej Pearsona między dwiema zmiennymi. Współczynnik mierzy siłę i kierunek związku między dwiema zmiennymi. Przyjmuje wartości od -1 do 1, gdzie -1 oznacza doskonałą ujemną korelację, 1 oznacza doskonałą dodatnią korelację, a 0 oznacza brak korelacji.
+
+```{r}
+#| echo: true
+dane %>% 
+  select_if(is.numeric) %>% 
+  cor() %>% 
+  ggcorrplot::ggcorrplot(hc.order = TRUE,
+    type = "lower", insig = "blank")
+```
+
+### Rozkłady
+
+**Skośność** (ang. skewness) jest miarą asymetrii rozkładu prawdopodobieństwa lub rozkładu danych wokół średniej. Informuje nas o tym, jak rozkład jest "skośny" względem osi środkowej.
+
+Istnieją trzy główne typy skośności:
+
+`Skośność dodatnia`: W tym przypadku wartości danych lub obserwacji częściej występują na lewo od średniej, a prawa ogon rozkładu jest dłuższy. Oznacza to, że występują wartości odstające (outliers) na prawo od średniej, a większość wartości jest mniejsza niż średnia. Skośność dodatnia wskazuje na większe nagromadzenie mniejszych wartości.
+
+`Skośność ujemna`: W tym przypadku wartości danych lub obserwacji częściej występują na prawo od średniej, a lewy ogon rozkładu jest dłuższy. Oznacza to, że występują wartości odstające (outliers) na lewo od średniej, a większość wartości jest większa niż średnia. Skośność ujemna wskazuje na większe nagromadzenie większych wartości.
+
+`Skośność zerowa (symetryczność)`: W tym przypadku wartości danych lub obserwacji są równomiernie rozłożone wokół średniej. Lewy i prawy ogon rozkładu mają podobne długości. Skośność zerowa oznacza, że rozkład jest symetryczny względem osi środkowej.
+
+W praktyce, skośność jest ważną miarą, ponieważ pomaga w zrozumieniu kształtu rozkładu danych i może dostarczyć dodatkowych informacji na temat charakterystyki badanych zmiennych.
+
+```{r}
+#| echo: true
+library(ggplot2)
+
+numeric_vars <- dane[, sapply(dane, is.numeric)]
+
+long_data <- tidyr::pivot_longer(numeric_vars, cols = -id)
+
+colors <- c("steelblue", "darkorange", "forestgreen", "purple", "deeppink")
+
+ggplot(long_data, aes(x = value, fill = name)) +
+  geom_histogram(color = "grey", binwidth = 0.5) +
+  facet_wrap(~ name, scales = "free") +
+  labs(title = "Histogramy") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, color = "#8f8146", size = rel(2), face = c("bold", "italic")))
+
+```
+
+```{r}
+#| echo: true
+library(gt)
+na.omit(dane) %>% select_if(is.numeric) %>% 
+  pivot_longer(cols = everything(), names_to = "Zmienna") %>% 
+  group_by(Zmienna) %>% 
+  summarize(Skośność = e1071::skewness(value)) %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) %>% 
+  scroll_box(height = "450px")
+
+```
+
+W naszych danych nie występują znacznie asymetryczne zmienne, więc nie będziemy transformować zmiennych.
+
+### Niezależność cech
+
+Dokładne badanie `niezależności cech` pozwala nam ocenić, czy występuje statystycznie istotna relacja pomiędzy zmiennymi w zbiorze danych, czy też są one niezależne. W kontekście analizy statystycznej, niezależność cech oznacza brak związku między dwiema zmiennymi, tzn. zmienność jednej zmiennej nie wpływa na zmienność drugiej zmiennej.
+
+
+#### Test niezależności
+
+Test niezależności cech, znany również jako test chi-kwadrat ($\chi^2$), jest statystycznym testem używanym do oceny związku między dwiema zmiennymi kategorycznymi. Celem testu jest sprawdzenie, czy istnieje statystycznie istotna zależność między tymi zmiennymi, czy też są one niezależne.
+
+Test chi-kwadrat opiera się na porównaniu wartości obserwowanych z wartościami oczekiwanymi w celu określenia, czy występują znaczące różnice między nimi. Wyniki testu są wyrażane za pomocą statystyki chi-kwadrat ($\chi^2$) oraz wartości p, która informuje o istotności zależności.
+
+Podstawowe założenie testu niezależności cech jest takie, że obserwowane wartości są niezależne i pochodzą z rozkładu teoretycznego. Jeśli statystyka chi-kwadrat jest wystarczająco duża i wartość p jest mniejsza od ustalonego poziomu istotności, odrzucamy hipotezę zerową i stwierdzamy istnienie zależności między zmiennymi.
+
+
+$H_0$: Zmienne X i Y są niezależne.
+
+$H_1$: zmienne X i Y nie są niezależne.
+
+
+
+Test $\chi ^2$ bazuje na porównaniu ze sobą wartości obserwowanych a wartości teorytycznych. Duże różnice wskazują na istnienie zależności pomiędzy zmiennymi.
+
+Jeśli założymy, że zmienna $X$ zmienia się na $k$ poziomach, a zmienna $Y$ na $s$ poziomach, to statystykę testową obliczymy korzystając z wzoru:
+
+$$\chi ^2 = \sum_{i = 1}^{k}\sum_{j = 1}^{s}\frac{(n_{ij}-\acute n_{ij})^2}{\acute n_{ij}}$$
+
+-   $n_{ij}$ - liczności obserwowane.
+
+-   $\acute n_{ij}$ - liczności teoretyczne.
+
+Przy założeniu prawdziwości $H_0$ $\chi^2 \sim \chi^2_{(k-1)(s-1)}$
+
+```{r}
+#| echo: true
+dane$satisfaction <- as.character(dane$satisfaction)
+dane$purpose_of_travel <- as.character(dane$purpose_of_travel)
+p <- c()
+statystyka <- c()
+kat <- dane %>% select_if(is.character)
+
+for (i in names(kat)[-which(names(kat) == "satisfaction")]) {
+  test <- chisq.test(kat[["satisfaction"]], kat[[i]])
+  p <- c(p, test$p.value)
+  statystyka <- c(statystyka, round(test$statistic, 2))
+}
+
+chi <- data.frame(p = round(p, 3), Chisq = statystyka)
+
+rownames(chi) <- names(kat)[-which(names(kat) == "satisfaction")]
+
+istotnosc <- ifelse(chi$p > 0.05, yes = "Niezależne", "Nieniezależne")
+chi <- cbind(chi, Wniosek = istotnosc)
+chi %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) %>% 
+  column_spec(column = 1, italic = TRUE) %>% 
+  row_spec(which(chi$Wniosek == "Nieniezależne")) %>% 
+  row_spec(which(chi$Wniosek == "Niezależne"), bold = T)
+
+```
+
+## Budowa modeli
+*Budowa modeli* jest kluczowym etapem w analizie danych, w którym tworzymy modele uczenia maszynowego w celu przewidywania lub wyjaśniania zależności w danych. Zmienne, które zostały użyte do modelowania `satisfaction` to `Gender + age + customer_type + type_of_travel +` `customer_class + departure_delay_in_minutes + arrival_delay_in_minutes`.
+
+Przed przystąpieniem do budowy modeli, przeprowadzono pewne operacje preprocessingu danych. Standaryzacja danych została zastosowana, aby dostosować zmienne do podobnej skali, co może poprawić wydajność niektórych modeli. Ponadto, zmienne kategoryczne, takie jak płeć, typ klienta, rodzaj podróży i klasa klienta, zostały przekształcone na tzw. *dummy variables*, które pozwalają na uwzględnienie tych kategorii w modelowaniu.
+
+Następnie, wybrane modele zostały optymalizowane poprzez przeszukiwanie siatki regularnej (grid search) z użyciem funkcji `grid_latin_hypercube()`. Ta metoda pozwala na przetestowanie różnych kombinacji hiperparametrów modelu w celu znalezienia optymalnego zestawu parametrów.
+
+```{css}
+.my-table {
+   border: 2px solid red;
+  padding: 10px;
+  background-color: rgba(50, 50, 50, 0.3);
+  color: red;
+  border-radius: 20px;
+  text-align: center;
+  font-style: italic;
+  font-family: Arial, sans-serif;
+}
+
+```
+:::{.my-table}
+Aby zoptymalizować operacje na zbiorze, dalsze operacje będą wykonywane na próbce 7000 elementów naszego zbioru
+:::
+
+```{r}
+#| include: false
+prop.table(table(dane$Gender))
+prop.table(table(dane$satisfaction))
+library(sampler)
+set.seed(2023)
+dane <- sampler::ssamp(df = dane, n = 7000, strata = satisfaction)
+prop.table(table(dane$Gender))
+prop.table(table(dane$satisfaction))
+
+```
+
+### Podział zbioru danych
+
+Podział zbioru danych jest niezbędnym krokiem podczas budowy modeli. Polega on na podziale dostępnych danych na zbiór treningowy i zbiór testowy. Przyjmijmy proporcje `66.6% : 33.3%`
+
+```{r}
+set.seed(2023)
+split <- initial_split(data = dane, prop = 2/3, strata = satisfaction)
+
+training_set <- training(split)
+testing_set <- testing(split)
+
+```
+
+```{r}
+rec <- recipe(satisfaction ~ Gender + Age + purpose_of_travel + Type.of.Travel + Type.Of.Booking + Stay.comfort + Cleanliness, data = training_set) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+```
+
+Zbiór testowy jest istotny w procesie modelowania, ponieważ pozwala na obiektywną i końcową ocenę wydajności modelu na nowych danych.
+
+#### Walidacja krzyzowa
+
+*Walidacja krzyżowa* jest techniką oceny wydajności modelu, która polega na podziale danych na zbiór treningowy i zbiór testowy w sposób powtarzalny i niezależny. Jest to powszechnie stosowana metoda w uczeniu maszynowym, aby ocenić, jak dobrze model generalizuje wzorce na nowych danych.
+
+Proces walidacji krzyżowej może być opisany następująco:
+
+- `Podział danych`: Zbiór danych jest podzielony na $k$ części, nazywanych foldami, gdzie $k$ to ustalona liczba większa od 1. Każdy fold zawiera tę samą proporcję danych.
+
+- `Iteracja`: Przebiegamy przez $k$ iteracji, gdzie w każdej iteracji jeden z foldów jest wykorzystywany jako zbiór testowy, a pozostałe foldy są używane jako zbiór treningowy.
+
+- `Trenowanie i testowanie modelu`: W każdej iteracji model jest trenowany na zbiorze treningowym i testowany na zbiorze testowym. Wydajność modelu jest oceniana na podstawie ustalonej miary, takiej jak dokładność, precyzja, czułość itp.
+
+- `Uśrednianie wyników`: Wyniki uzyskane z poszczególnych iteracji są uśredniane, aby otrzymać ogólną miarę wydajności modelu. Można również obliczyć odchylenie standardowe lub przedziały ufności dla uzyskanych wyników, aby ocenić stabilność modelu.
+
+Walidacja krzyżowa jest ważna, ponieważ umożliwia ocenę, jak dobrze model generalizuje wzorce w danych, zamiast polegać tylko na wynikach na zbiorze treningowym. Pomaga również w identyfikacji problemów związanych z nadmiernym dopasowaniem (overfitting) lub niedostatecznym dopasowaniem (underfitting) modelu.
+
+```{r}
+set.seed(2023)
+folds <- vfold_cv(data = training_set, v = 10)
+keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
+metrs <- metric_set(accuracy, kap, sensitivity, roc_auc, precision, recall, f_meas)
+```
+
+### Budowa i dopasowanie modeli metodą walidacji krzyżowej
+
+Do oceny dopasowania modeli na podstawie walidacji krzyżowej posłużą miary:
+
+- `Accuracy` (dokładność): Dokładność jest najprostszą miarą oceny modelu i mierzy ogólną skuteczność modelu w przewidywaniu poprawnej klasy. Jest to stosunek liczby poprawnych przewidywań do liczby wszystkich przewidywań. Wyższa wartość dokładności oznacza lepsze dopasowanie modelu.
+
+- `F-measure` (średnia F): F-measure jest miarą, która łączy precyzję (precision) i czułość (recall) w jedną wartość. Jest szczególnie przydatna, gdy istnieje nierównowaga między klasami (np. duża różnica w liczbie przypadków pozytywnych i negatywnych). Wyższa wartość F-measure oznacza lepszą równowagę między precyzją a czułością.
+
+- `Kappa Cohen'a` ($\kappa$ Cohen'a): Kappa Cohen'a jest miarą oceny zgodności między przewidywaniami modelu a rzeczywistymi etykietami. Kappa uwzględnia przypadki, w których dokładność przewidywań może wynikać z czystego przypadku. Wartość kappa bliska 1 oznacza wysoką zgodność modelu z rzeczywistymi danymi.
+
+- `Precision` (precyzja): Precyzja mierzy proporcję poprawnie przewidzianych pozytywnych przypadków (true positives) do wszystkich przewidzianych pozytywnych przypadków (true positives + false positives). Wyższa wartość precyzji oznacza większą dokładność modelu w identyfikowaniu pozytywnych przypadków.
+
+- `Recall` (czułość): Czułość mierzy proporcję poprawnie przewidzianych pozytywnych przypadków (true positives) do wszystkich rzeczywistych pozytywnych przypadków (true positives + false negatives). Czułość informuje o zdolności modelu do wykrywania wszystkich istotnych przypadków danej klasy.
+
+- `ROC AUC` (obszar pod krzywą ROC): ROC AUC jest miarą jakości modelu, która ocenia zdolność modelu do rozróżniania między klasami. Krzywa ROC (Receiver Operating Characteristic) to wykres prezentujący zależność między czułością a 1-specyficznością (1-minus swoistość). Obszar pod krzywą ROC (ROC AUC) jest używany jako miara jakości modelu, przy czym wartość bliska 1 wskazuje na wysoką zdolność modelu do rozróżniania klas.
+
+- `Sensitivity` (czułość): Sensitivity jest inną nazwą dla recall i oznacza zdolność modelu do poprawnego wykrywania pozytywn przypadków. Informuje o proporcji prawdziwie pozytywnych przypadków, które zostały poprawnie zidentyfikowane przez model.
+
+
+#### Drzewo decyzyjne
+
+**Model drzewa decyzyjnego** jest strukturą hierarchiczną, która jest wykorzystywana do podejmowania decyzji na podstawie zestawu reguł logicznych. Składa się z wierzchołków (węzłów) i krawędzi. Każdy wierzchołek reprezentuje test logiczny na atrybucie danych, a krawędzie wychodzące z wierzchołka reprezentują różne możliwe wyniki tego testu. Liście drzewa reprezentują etykiety lub wartości decyzyjne.
+
+```{r}
+dt_mod <- decision_tree(mode = "classification", min_n = 50)
+ 
+ dt_wflow <- workflow() %>%
+   add_recipe(rec) %>%
+   add_model(dt_mod)
+```
+
+Hyperparametry w drzewach decyzyjnych to parametry, które nie są bezpośrednio szacowane na podstawie danych, ale muszą być ustalone przed rozpoczęciem procesu budowy drzewa. Kilka ważnych hyperparametrów drzewa decyzyjnego to:
+
+1. Maksymalna głębokość drzewa (`tree_depth`): Określa maksymalną liczbę poziomów w drzewie. Głębokość drzewa ma wpływ na złożoność modelu i jego zdolność do dopasowania do szczegółów danych. Zbyt duża głębokość może prowadzić do nadmiernego dopasowania, podczas gdy zbyt mała może prowadzić do niedostatecznego dopasowania.
+
+2. Minimalna liczba próbek w liściu (`min_bucket`): Określa minimalną liczbę próbek, które muszą znaleźć się w liściu drzewa. Ustalenie tej wartości pozwala na kontrolę przetrenowania modelu. Zbyt mała wartość może prowadzić do nadmiernego dopasowania, a zbyt duża może prowadzić do niedostatecznego dopasowania.
+
+3. Minimalna liczba próbek w węźle (`min_n`): Określa minimalną liczbę próbek wymaganą do podziału węzła. Pomaga w kontroli złożoności modelu i unikaniu podziałów, które nie przynoszą istotnej informacji. Zbyt mała wartość może prowadzić do nadmiernego dopasowania.
+
+4. Kryterium podziału (`split criterion`): Określa miarę używaną do oceny jakości podziału węzła. Popularnymi kryteriami są indeks Giniego (`gini`) i współczynnik zysku informacyjnego (`entropy`). Indeks Giniego mierzy impurity (niejednorodność) zbioru danych, podczas gdy współczynnik zysku informacyjnego mierzy zmniejszenie entropii po podziale.
+
+Te hyperparametry mają duży wpływ na strukturę i działanie drzewa decyzyjnego. Ich odpowiednie dostosowanie pozwala na kontrolę złożoności modelu, unikanie nadmiernego dopasowania (overfitting) i niedostatecznego dopasowania (underfitting) oraz uzyskanie optymalnej wydajności na nowych danych. Wybór odpowiednich wartości hyperparametrów wymaga eksperymentów i dostosowania do konkretnego problemu i zbioru danych.
+
+
+`rpart` jest skrótem od Recursive Partitioning and Regression Trees (Rekurencyjne Podziałowe Drzewa Regresji). Jest to popularny i potężny algorytm uczenia maszynowego wykorzystywany do budowy drzew decyzyjnych w celu klasyfikacji lub regresji.
+
+Algorytm `rpart` w R korzysta z rekurencyjnej strategii podziału węzłów na podstawie różnych kryteriów, takich jak indeks Giniego lub współczynnik zysku informacyjnego. Podczas budowy drzewa decyzyjnego, algorytm iteracyjnie dzieli zbiór danych na podzbiory węzłów w taki sposób, aby optymalnie separować klasy lub przewidywać wartości numeryczne..Podczas procesu budowy drzewa decyzyjnego, silnik rpart uwzględnia różne czynniki, takie jak jakość podziału, złożoność drzewa (aby uniknąć nadmiernego dopasowania) i minimalizację błędu prognoz.
+
+Zbudowane zostały dwa drzewa decyzyjne z silnikiem `rpart`:
+
+-   z parametrem `min_n` = 50:
+
+```{r}
+#| echo: true
+dt_mod %>% translate()
+```
+
+Ocena miar dopasowania na podstwie walidacji krzyżowej:
+
+```{r} 
+#| echo: true
+# library(doParallel)
+# cl <- makePSOCKcluster(5)
+# registerDoParallel(cl)
+# dt_wflow <- dt_wflow %>%
+#   fit_resamples(folds, metrics = metrs, control = keep_pred)
+# save(dt_wflow, file = "drz_base.RData")
+
+ 
+load(file = "drz_base.RData")
+
+dt_metrs <- dt_wflow %>% collect_metrics()
+
+dt_metrs %>% select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+```
+
+Wynik tuningowania z przeszukiwaniem siatki:
+
+```{r}
+#| echo: true
+# tree_engine <- decision_tree(mode = "classification",
+#                               cost_complexity = tune(),
+#                               min_n = tune(), tree_depth = tune() )
+# 
+# 
+# tree_workflow <- workflow() %>%
+#    add_recipe(rec) %>%
+#    add_model(tree_engine)
+# 
+# 
+# tree_tune <- tune_grid(
+#    tree_workflow,
+#    resamples = folds,
+#    grid = 20,
+#   metrics = metric_set(roc_auc), control = keep_pred)
+# 
+# save(tree_tune, file = "drz_tune.RData")
+ load("drz_tune.RData")
+# tree_best <- finalize_workflow(tree_workflow, select_best(tree_tune))
+#  tree_best_folds <- tree_best %>%
+#      fit_resamples(resamples = folds, metrics = metrs, control = keep_pred)
+# 
+#  save(tree_best_folds,file = "drz_best_folds.RData" )
+#  save(tree_best, file = "drz_best.RData")
+
+load(file = "drz_best.RData")
+load(file = "drz_best_folds.RData")
+
+
+tree_tune %>% show_best() %>% 
+  select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) 
+
+```
+
+Model postaci
+
+```{r}
+#| echo: true
+tree_tune %>% select_best()
+
+tree_best_metrics <- tree_best_folds %>% collect_metrics()
+tree_best_metrics %>% select(-.estimator, -.config) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+```
+
+```{r}
+#| echo: true
+rpart_tree <- tree_best %>% fit(training_set) %>% extract_fit_parsnip() 
+rpart_tree$fit %>% rpart.plot::rpart.plot(roundint = FALSE)
+
+```
+
+
+#### Regresja logistyczna
+
+
+**Regresja logistyczna** jest techniką klasyfikacji stosowaną w przypadkach, gdy zmienna wynikowa przyjmuje dwie kategorie (np. sukces/porażka, tak/nie). Modeluje ona prawdopodobieństwo przynależności do jednej z tych kategorii na podstawie liniowej kombinacji zmiennych niezależnych.
+
+W regresji logistycznej wykorzystuje się funkcję logit, która przekształca liniową kombinację predyktorów X w zakres prawdopodobieństw (od 0 do 1). Funkcja logit jest definiowana jako logarytm szans (log-odds) przynależności do jednej z kategorii.
+
+```{r}
+#| echo: true
+# log_reg <- logistic_reg(mode = "classification")
+# lreg_wflow <- workflow() %>%
+#   add_model(log_reg) %>%
+#   add_recipe(rec)
+ 
+# lreg_wflow <- lreg_wflow %>%
+#    fit_resamples(folds, metrics = metrs, control = keep_pred)
+ 
+# save(lreg_wflow, file = "lreg_wflow.RData")
+
+load(file = "lreg_wflow.RData")
+
+```
+
+Ocena wydajności na sprawdzianie krzyżowym:
+
+```{r}
+#| echo: true
+lreg_metrs <- lreg_wflow %>% collect_metrics()
+
+lreg_metrs %>% select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+```
+
+
+#### Las losowy
+
+*Las losowy* (Random Forest) popularny algorytm uczenia maszynowego, wykorzystuje technikę ensemble learning. Jest to zbiór drzew decyzyjnych, gdzie każde drzewo jest trenowane na losowo wybranym podzbiorze danych treningowych, a ostateczna predykcja jest dokonywana na podstawie głosowania większościowego (klasyfikacja) lub uśredniania (regresja) predykcji wszystkich drzew w lesie.
+
+```{r}
+#| echo: true
+# rf_mod <- rand_forest(mode = "classification",
+#                       mtry = tune(),
+#                       min_n = tune(),
+#                       trees = tune())
+
+ # rf_params <- rf_mod %>%  extract_parameter_set_dials()
+ # 
+ # rf_params <- rf_params %>% update("mtry" = mtry(range = c(1, 9)),
+ #                      "min_n" = min_n(range = c(20, 150))) 
+ # set.seed(2023)
+ # rf_grid <- grid_latin_hypercube(rf_params, size = 20)
+ # rf_grid
+ # 
+ # rf_wflow <- workflow() %>%
+ #   add_model(rf_mod) %>%
+ #   add_recipe(rec)
+ # 
+ # rf_wflow <- tune_grid(rf_wflow, resamples = folds,grid = rf_grid, metrics = metric_set(roc_auc), control = keep_pred)
+ # 
+ # save(rf_wflow, file = "randfor_wflow.RData")
+
+load(file = "randfor_wflow.RData")
+
+
+#| echo: true
+#  rf_best <- workflow() %>% add_recipe(rec) %>% add_model(rf_mod)
+# 
+#  rf_best <- rf_best %>% finalize_workflow(parameters = select_best(rf_wflow))
+#  
+# save(rf_best, file = "randfor_best.RData")
+
+ load("randfor_best.RData")
+#  
+#  rf_best_wf <- workflow() %>% add_recipe(rec) %>% add_model(rf_best %>% extract_spec_parsnip())
+#  
+#  rf_best_metrs <- rf_best_wf %>%
+#    fit_resamples(folds, metrics = metrs)
+ 
+#  save(rf_best_metrs, file ="randfor_best_metrs.RData")
+
+load("randfor_best_metrs.RData")
+rf_metrs <- rf_best_metrs %>% collect_metrics
+
+
+rf_wflow %>% show_best() %>% select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) 
+
+```
+
+
+#### LDA - Linear Discriminant Analysis
+
+*Liniowa analiza dyskryminacyjna* (ang. Linear Discriminant Analysis, LDA) to jedna z popularnych metod klasyfikacji i redukcji wymiarowości w analizie danych. LDA ma na celu znalezienie liniowej kombinacji zmiennych niezależnych, która maksymalnie separuje różne grupy danych.
+
+```{r}
+#| echo: true
+# set.seed(2023)
+# lda_mod <- discrim_linear()
+ 
+# library(discrim)
+# lda_wflow <- workflow() %>%
+#   add_model(lda_mod) %>%
+#   add_recipe(rec)
+ 
+# lda_wflow <- lda_wflow %>%
+#   fit_resamples(folds, metrics = metrs, control = keep_pred)
+# save(lda_wflow, file = "lda_wflow.RData")
+load(file = "lda_wflow.RData")
+
+
+lda_metrs <- lda_wflow %>% collect_metrics()
+lda_metrs %>% 
+  select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+```
+
+
+#### KNN
+
+
+Algorytm K-nearest neighbors (**KNN**) to prosty i popularny algorytm uczenia maszynowego, który może być wykorzystywany zarówno do klasyfikacji, jak i do regresji. Jest to przykład algorytmu leniwego (lazy), który nie tworzy modelu na etapie trenowania, ale zachowuje cały zbiór treningowy do podejmowania decyzji na podstawie podobieństwa do najbliższych sąsiadów.
+
+Działanie algorytmu **KNN** polega na znajdowaniu k najbliższych sąsiadów danego punktu w przestrzeni cech i przypisywaniu mu etykiety klasy (w przypadku klasyfikacji) lub wartości (w przypadku regresji) na podstawie etykiet najbliższych sąsiadów. Odległość między punktami jest zwykle obliczana przy użyciu metryki euklidesowej, choć istnieją również inne metryki, takie jak metryka Manhattan.
+
+W przypadku klasyfikacji, algorytm **KNN** przypisuje punktowi etykietę klasy, która jest najczęściej występującą wśród k najbliższych sąsiadów. W przypadku regresji, algorytm KNN przypisuje punktowi średnią lub medianę wartości etykiet k najbliższych sąsiadów.
+
+Parametr k w algorytmie **KNN** oznacza liczbę sąsiadów branych pod uwagę przy podejmowaniu decyzji. Wybór odpowiedniej wartości k ma wpływ na wyniki predykcji.
+
+Dodatkowo, miara odległości i funkcja wagowa są istotnymi parametrami algorytmu **KNN**. Miara odległości określa, jak obliczana jest odległość między punktami, a funkcja wagowa decyduje, jak ważne są poszczególne sąsiedztwa przy podejmowaniu decyzji.
+
+Model `KNN` zbudowany został z silnikiem `kknn` z optymalizowanymi parametrami liczby sąsiadów (`neighbors`) i miary odległości (`weight_func`) pod kątem `roc_auc`.
+```{r}
+#| echo: true
+#  knn_mod <- nearest_neighbor(mode = "classification",
+#                           engine = "kknn", neighbors = tune(),weight_func = tune())
+#  
+#  knn_wflow <- workflow() %>%
+#    add_model(knn_mod) %>%
+#     add_recipe(rec)
+#  
+#  knn_params <- extract_parameter_set_dials(knn_wflow)
+#  knn_params <- knn_params %>% update(neighbors = neighbors(range = c(6, 100)))
+#   
+#  knn_grid <- grid_latin_hypercube(knn_params, size = 25)
+#  knn_tune <- tune_grid(knn_wflow, resamples = folds, grid = knn_grid,
+#                        metrics = metric_set(roc_auc), control = keep_pred)
+#  
+# save(knn_tune, file = "knn_tune.RData")
+# 
+#  knn_tune %>% show_best()
+#  knn_best_mod <- finalize_workflow(knn_wflow, select_best(knn_tune))
+#  
+# save(knn_best_mod, file = "knn_best_mod.RData")
+# 
+#  knn_metrs <- knn_best_mod %>%
+#   fit_resamples(folds, metrics = metrs, control = keep_pred)
+#  
+#  knn_best_fit <- knn_metrs
+#  
+# save(knn_best_fit, file = "knn_best_fit.RData")
+ 
+ load("knn_best_mod.RData")
+ load(file = "knn_best_fit.RData")
+
+knn_metrs <- knn_best_fit %>%  collect_metrics()
+
+```
+
+
+Najlepiej podczas sprawdzianu krzyżowego wypadł model
+
+```{r}
+#| echo: true
+knn_best_mod %>% extract_spec_parsnip()
+knn_metrs %>% select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+```
+
+
+#### Boosted trees 
+
+**Boosted Trees** jest efektywną metodą uczenia maszynowego, która może osiągać bardzo dobre wyniki predykcyjne. Poprzez sekwencyjne uczenie na błędach poprzednich modeli, można wzmocnić zdolności predykcyjne modelu i dostosować go do trudniejszych przypadków w zbiorze danych.
+
+Algorytm **Boosted Trees** polega na tworzeniu prostych drzew decyzyjnych (nazywanych "słabymi klasyfikatorami" lub "słabymi regresorami") i łączeniu ich w silny klasyfikator/regresor poprzez iteracyjne dostosowanie wag próbek, na których poprzednie modele popełniły błąd.
+
+Model boosted zbudowany został z silnikiem `xgboost` z optymalizowanymi `mtry`, `min_n`, `learn_rate`, `loss_reduction` pod kątem miary `roc_auc`.
+```{r}
+#| echo: true
+ # boost_mod <-boost_tree(mode = "classification",
+ #                        engine = "xgboost",mtry = tune(),min_n = tune(),learn_rate = tune(),loss_reduction = tune())
+ # 
+ # boost_wflow <- workflow() %>%
+ #   add_model(boost_mod) %>%
+ #   add_recipe(rec)
+ # 
+ # boost_params <- extract_parameter_set_dials(boost_wflow)
+ # 
+ # boost_params <- boost_params %>% update("mtry" = mtry(range = c(1, 9)),
+ #                         "min_n" = min_n(range = c(20, 150)))
+ # 
+ # boost_grid <- grid_latin_hypercube(boost_params, size = 20)
+ # 
+ # boost_tune <- tune_grid(boost_wflow, resamples = folds,grid = boost_grid,metrics = metric_set(roc_auc), control = keep_pred)
+ # 
+ # save(boost_wflow, file = "boost_wflow.RData")
+ # save(boost_tune, file = "boost_tune.RData")
+ 
+load(file = "boost_tune.RData")
+
+
+boost_tune %>% show_best() %>% select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+ # boost_best <- finalize_workflow(boost_wflow, select_best(boost_tune))
+ # save(boost_best, file = "boost_best.RData")
+
+load(file = "boost_best.RData")
+
+ # boost_best_results <- boost_best %>%
+ #   fit_resamples(folds, metrics = metrs)
+ # save(boost_best_results, file = "boost_best_metrs.RData")
+
+load("boost_best_metrs.RData")
+
+```
+
+
+Ocena dopasowania na podstawie walidacji krzyżwej:
+
+```{r}
+#| echo: true
+boost_best 
+gbm_metrs <- boost_best_results %>% collect_metrics()
+
+gbm_metrs %>% select(-c(".estimator", ".config")) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+```
+
+
+### Streszczenie
+
+```{r}
+#| echo: true
+#| include: false
+
+ # tuningowane <- list(tuned_dt = tree_best, tuned_rf = rf_best, tuned_gbm = boost_best, knn_tuned = knn_best_mod)
+ # tuningowane <- lapply(tuningowane, FUN = pull_workflow_spec)
+ # 
+ # base <- list(decision_tree = decision_tree(mode = "classification", min_n = 50),
+ #              lreg = logistic_reg(mode = "classification"),
+ #             lda = discrim_linear(mode = "classification"))
+ # 
+ # models <- append(tuningowane, base)
+ # models <- models[vars]
+ # fit_model <- function(model){
+ #   x <- workflow() %>%
+ #     add_recipe(rec) %>%
+ #     add_model(model)
+ # 
+ #   results <- x %>% fit(data = training_set)
+ #   return(results)
+ # }
+ # 
+ # train_fit <- lapply(models, FUN = fit_model)
+ # 
+ # training_set$satisfaction <- factor(training_set$satisfaction)
+ # 
+ # rocs <- lapply(train_fit, FUN = function(x){augment(x, training_set) %>% select(satisfaction, starts_with(".pred")) %>%
+ #   roc_curve(truth = satisfaction, estimate = `.pred_neutral or dissatisfied`)})
+ # 
+ # dt_roc <- NULL
+ # 
+ # for(i in names(rocs)){
+ #   a <- rocs[[i]]
+ #   a$model <- i
+ #   dt_roc <- rbind(dt_roc, a)
+ # }
+ # save(dt_roc, file = "dt_roc.RData")
+
+```
+
+
+
+```{r}
+#| include: false
+#| context: data
+
+results <- list(decision_tree = dt_metrs %>% select(.metric, mean),
+tuned_dt = tree_best_metrics %>% select(.metric, mean),
+lreg = lreg_metrs %>% select(.metric, mean),
+lda = lda_metrs %>% select(.metric, mean),
+tuned_rf = rf_metrs %>% select(.metric, mean),
+tuned_gbm = gbm_metrs %>% select(.metric, mean),
+knn_tuned = knn_metrs %>% select(.metric, mean))
+
+
+load("dt_roc.RData")
+
+```
+
+```{r}
+#| echo: true
+
+selected_models <- c("tuned_dt", "tuned_rf", "tuned_gbm", "knn_tuned", "decision_tree", "lreg", "lda")
+# Filter the data frame to include only the selected models
+filtered_roc <- dt_roc %>% filter(model %in% selected_models)
+
+# Create the ROC curve plot using ggplot2
+plot <- ggplot(filtered_roc, aes(x = 1 - specificity, y = sensitivity, color = model)) +
+  geom_line() +
+  labs(x = "False Positive Rate", y = "True Positive Rate", title = "ROC Curve Comparison") +
+  scale_color_discrete(name = "Model") +
+  theme_minimal()
+
+# Display the plot
+plot
+
+```
+
+```{r}
+#| echo: true
+# Create an empty data frame to store the combined table
+combined_table <- data.frame(.metrics = unique(unlist(lapply(results, function(df) df$.metric))), stringsAsFactors = FALSE)
+
+# Populate the columns of means for each model
+for (model_name in names(results)) {
+  means <- results[[model_name]]$mean
+  combined_table[[model_name]] <- means[match(combined_table$.metrics, results[[model_name]]$.metric)]
+}
+
+kbl(combined_table, caption = "Model Metrics") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+```
+
+
+### Wybór najlepszego
+W kontekście dopasowania modeli nie różnią się za bardzo, ale po bliższym przyjrzeniu się model lasu losowego może być najleprzym dla następnych kroków.
+
+## Ewaluacja modelu na zbiorze testowym
+
+```{r}
+#| echo: true
+library(vip)
+
+rf_best %>% pull_workflow_spec()
+
+
+ranger_rf <- rand_forest(mode = "classification", mtry = 2, trees = 967, min_n = 82) %>% set_engine("ranger", importance = "impurity")
+
+ranger_fit <- workflow() %>% 
+  add_recipe(rec) %>% 
+  add_model(ranger_rf) %>% 
+  fit(training_set)
+
+
+ranger_fit %>% 
+  extract_fit_parsnip() %>% 
+  vip(aesthetics = list(fill = "lightblue", alpha = 0.9))
+
+```
+
+
+Predykcja:
+
+```{r}
+#| echo: true
+ranger_fit %>% augment(new_data = testing_set) %>% 
+  select(satisfaction, starts_with(".pred")) %>% head(10) %>% 
+  kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+```
+
+```{r}
+#| echo: true
+# Przekształć zmienną satisfaction na typ factor
+testing_set$satisfaction <- as.factor(testing_set$satisfaction)
+
+# Oblicz macierz konfuzji
+cm <- ranger_fit %>% 
+  augment(new_data = testing_set) %>% 
+  select(satisfaction, starts_with(".pred")) %>%
+  conf_mat(truth = satisfaction, estimate = .pred_class)
+cm
+
+```
+
+
+Ocena dopasowania:
+
+```{r}
+#| echo: true
+ranger_fit %>% augment(new_data = testing_set) %>% 
+  metrs(truth = satisfaction, estimate = .pred_class, `.pred_neutral or dissatisfied`) %>% 
+  select(-.estimator) %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T)
+
+```
+
+
+# Podsumowanie
+W ramach projektu oceniania satysfakcji klientów hoteli europejskich skupiliśmy się na badaniu satysfakcji klienta jako kluczowego czynnika dla branży hotelarskiej. Nasze badania przyniosły pewne obiecujące wyniki, które dostarczają istotnych wniosków dla hoteli w Europie. Jednakże, istnieją pewne czynniki i ograniczenia, które należy wziąć pod uwagę.
+
+Pierwszym czynnikiem, który może wpływać na wyniki naszego modelu, jest jakość i kompletność danych. W przypadku braku dokładnych i wiarygodnych danych dotyczących satysfakcji klientów, nasza analiza może być ograniczona. Ważne jest, aby zapewnić dokładność i pełność danych, aby uzyskać wiarygodne wyniki.
+
+Kolejnym czynnikiem jest uwzględnienie różnorodności czynników wpływających na satysfakcję klientów. Istnieje wiele aspektów, takich jak obsługa, jakość usług, wyposażenie hotelu, lokalizacja itp., które mogą wpływać na satysfakcję klientów. Należy uwzględnić jak najwięcej tych czynników, aby uzyskać pełniejszy obraz i dokładniejsze prognozy dotyczące satysfakcji klientów.
+
+Warto również pamiętać, że satysfakcja klientów jest subiektywnym doświadczeniem, które może różnić się w zależności od indywidualnych preferencji i oczekiwań. Istnieje pewien stopień subiektywności związany z ocenianiem satysfakcji klientów, co może wpływać na wyniki i interpretację danych.
+
+Podsumowując, nasz projekt oceniania satysfakcji klientów hoteli europejskich dostarcza ważnych informacji i wniosków dla branży hotelarskiej. Jednak należy pamiętać o ograniczeniach i czynnikach, które mogą wpływać na wyniki. Ważne jest, aby kontynuować badania i uwzględniać jak najwięcej czynników w celu uzyskania bardziej kompleksowego i precyzyjnego modelu oceny satysfakcji klientów.
+
+
+# Bibliografia
+
+[1] *Dariusz Majerek. Eksploracja danych, 2020.*
+
+[2] *Donald E. Knuth. Datamining, 1986.*
+
+[3] *R Core Team. A Language and Environment for Statistical Computing, 2018.*
+
+[4] *François Chollet. Deep Learning with R*
+
+[5] *OpenAI. Chat GPT*
+
+[6] *StackOverflow*
